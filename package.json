@@ -1,0 +1,16 @@
+{
+  "name": "gs-types",
+  "packageManager": "yarn@3.3.0",
+  "devDependencies": {
+    "@types/jscodeshift": "^0",
+    "@yarnpkg/pnpify": "^4.0.0-rc.32",
+    "@yarnpkg/sdks": "^3.0.0-rc.32",
+    "jscodeshift": "^0.14.0",
+    "typescript": "^4.9.4"
+  },
+  "scripts": {
+    "transform": "yarn jscodeshift -t gnome-shell-extension-transform.js ./src",
+    "extract": "./extract.sh",
+    "compile": "yarn tsc -p tsconfig.json"
+  }
+}
