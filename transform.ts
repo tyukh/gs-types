@@ -7,10 +7,22 @@
 
 'use strict';
 
-import {API, FileInfo} from 'jscodeshift';
-import {ExpressionKind} from 'ast-types/gen/kinds';
+import { API, FileInfo } from 'jscodeshift';
+import { ExpressionKind } from 'ast-types/gen/kinds';
 
 export const parser = 'ts';
+
+function exportClasses(source: string, api: API): string {
+  const j = api.jscodeshift;
+  const root = j(source);
+
+  root.find(j.ClassDeclaration).forEach((path) => {
+    if (path.parent.value.type === 'Program')
+      j(path).replaceWith(j.exportNamedDeclaration(path.node));
+  });
+
+  return root.toSource();
+}
 
 function exportFunctions(source: string, api: API): string {
   const j = api.jscodeshift;
@@ -30,7 +42,7 @@ function exportVariables(source: string, api: API): string {
 
   root.find(j.VariableDeclaration).forEach((path) => {
     if (path.parent.value.type === 'Program') {
-      if (path.node.kind === 'var') 
+      if (path.node.kind === 'var')
         j(path).replaceWith(j.exportNamedDeclaration(path.node));
     }
   });
@@ -97,9 +109,10 @@ function importDeclarations(source: string, api: API): string {
 export default function transformer(file: FileInfo, api: API): string {
   let source: string = file.source;
 
+  source = exportClasses(source, api);
   source = exportFunctions(source, api);
   source = exportVariables(source, api);
-//  source = importDeclarations(source, api);
+  //  source = importDeclarations(source, api);
 
   return source;
 }

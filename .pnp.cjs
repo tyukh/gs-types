@@ -34,10 +34,12 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["@types/babel__preset-env", "npm:7.9.2"],\
             ["@types/jscodeshift", "npm:0.11.6"],\
             ["@types/node", "npm:18.11.15"],\
+            ["@types/prettier", "npm:2.7.1"],\
             ["@yarnpkg/pnpify", "npm:4.0.0-rc.32"],\
             ["@yarnpkg/sdks", "npm:3.0.0-rc.32"],\
             ["ast-types", "npm:0.14.2"],\
             ["jscodeshift", "virtual:d280f419356cb82ed0658079e03b757b33b6af2462e1c18929d792684bbf4874bd15e5593c02d8bd449caf40b013658986f84a49ad15cd862f35919c9e864ab1#npm:0.14.0"],\
+            ["prettier", "npm:2.8.1"],\
             ["ts-node", "virtual:d280f419356cb82ed0658079e03b757b33b6af2462e1c18929d792684bbf4874bd15e5593c02d8bd449caf40b013658986f84a49ad15cd862f35919c9e864ab1#npm:10.9.1"],\
             ["typescript", "patch:typescript@npm%3A4.8.4#~builtin<compat/typescript>::version=4.8.4&hash=0102e9"]\
           ],\
@@ -2774,6 +2776,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD"\
         }]\
       ]],\
+      ["@types/prettier", [\
+        ["npm:2.7.1", {\
+          "packageLocation": "./.yarn/cache/@types-prettier-npm-2.7.1-d46ada27e6-5e3f58e229.zip/node_modules/@types/prettier/",\
+          "packageDependencies": [\
+            ["@types/prettier", "npm:2.7.1"]\
+          ],\
+          "linkType": "HARD"\
+        }]\
+      ]],\
       ["@types/responselike", [\
         ["npm:1.0.0", {\
           "packageLocation": "./.yarn/cache/@types-responselike-npm-1.0.0-85dd08af42-e99fc7cc62.zip/node_modules/@types/responselike/",\
@@ -3770,10 +3781,12 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["@types/babel__preset-env", "npm:7.9.2"],\
             ["@types/jscodeshift", "npm:0.11.6"],\
             ["@types/node", "npm:18.11.15"],\
+            ["@types/prettier", "npm:2.7.1"],\
             ["@yarnpkg/pnpify", "npm:4.0.0-rc.32"],\
             ["@yarnpkg/sdks", "npm:3.0.0-rc.32"],\
             ["ast-types", "npm:0.14.2"],\
             ["jscodeshift", "virtual:d280f419356cb82ed0658079e03b757b33b6af2462e1c18929d792684bbf4874bd15e5593c02d8bd449caf40b013658986f84a49ad15cd862f35919c9e864ab1#npm:0.14.0"],\
+            ["prettier", "npm:2.8.1"],\
             ["ts-node", "virtual:d280f419356cb82ed0658079e03b757b33b6af2462e1c18929d792684bbf4874bd15e5593c02d8bd449caf40b013658986f84a49ad15cd862f35919c9e864ab1#npm:10.9.1"],\
             ["typescript", "patch:typescript@npm%3A4.8.4#~builtin<compat/typescript>::version=4.8.4&hash=0102e9"]\
           ],\
@@ -4386,6 +4399,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageDependencies": [\
             ["pkg-dir", "npm:3.0.0"],\
             ["find-up", "npm:3.0.0"]\
+          ],\
+          "linkType": "HARD"\
+        }]\
+      ]],\
+      ["prettier", [\
+        ["npm:2.8.1", {\
+          "packageLocation": "./.yarn/cache/prettier-npm-2.8.1-be60b51821-4f21a0f126.zip/node_modules/prettier/",\
+          "packageDependencies": [\
+            ["prettier", "npm:2.8.1"]\
           ],\
           "linkType": "HARD"\
         }]\
