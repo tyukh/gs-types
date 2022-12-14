@@ -1,4 +1,14 @@
+/* transform.ts
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ * SPDX-FileCopyrightText: 2022 Roman Tyukh
+ *
+ */
+
 'use strict';
+
+import {API, FileInfo} from 'jscodeshift';
+import {ExpressionKind} from 'ast-types/gen/kinds';
 
 export const parser = 'ts';
 
