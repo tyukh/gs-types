@@ -83,13 +83,6 @@ function updateExports(source, api) {
 
       if (path.node.declarations.length === 0) return;
       const declaration = path.node.declarations[0];
-    //++ rt
-      if (declaration.init === null) {
-		let exportDeclaration = j.exportNamedDeclaration(path.node);
-        j(path).replaceWith(exportDeclaration);      
-        return;
-      } 
-    //-- rt
       if (declaration.init.type === "ClassExpression") {
         if (!declaration.init.id || declaration.id.name === declaration.init.id.name) {
           j(path).replaceWith(
@@ -100,7 +93,7 @@ function updateExports(source, api) {
                 declaration.init.superClass
               )
             )
-          ); 
+          );
         } else {
           let spec = j.exportSpecifier.from({
             local: j.identifier(declaration.init.id.name),
@@ -117,28 +110,22 @@ function updateExports(source, api) {
                 declaration.init.superClass
               )
             )
-            .insertAfter(exportDeclaration); 
+            .insertAfter(exportDeclaration);
         }
 
         return;
       }
-    //++ rt
-      if (path.parent.node.type !== "Program") return;
-    //-- rt
-    
-      /* let exportDeclaration = j.exportNamedDeclaration(
+      let exportDeclaration = j.exportNamedDeclaration(
         j.variableDeclaration("const", [
           j.variableDeclarator(
             j.identifier(path.node.declarations[0].id.name),
             path.node.declarations[0].init
           ),
         ])
-      ); 
+      );
 
-      j(path).replaceWith(exportDeclaration); */
-      let exportDeclaration = j.exportNamedDeclaration(path.node);
       j(path).replaceWith(exportDeclaration);
-    }); 
+    });
 }
 
 /**
@@ -151,13 +138,10 @@ export function updateFunctionExports(source, api) {
   return j(source)
     .find(j.FunctionDeclaration)
     .forEach((path) => {
-    //++ rt
-      if (path.parent.node.type !== "Program") return;
-    //-- rt
       let exportDeclaration = j.exportNamedDeclaration(path.node);
 
       j(path).replaceWith(exportDeclaration);
-    }); 
+    });
 }
 
 function updateInlineImports(source, api) {
@@ -233,8 +217,8 @@ function renameClassBindings(source, api) {
 }
 
 const transforms = [
-//  updateImports,
-//  updateInlineImports,
+  updateImports,
+  updateInlineImports,
   updateExports,
   renameClassBindings,
   updateFunctionExports,
@@ -252,4 +236,3 @@ export default function transformer(file, api) {
 
   return source;
 }
-
