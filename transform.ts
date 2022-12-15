@@ -8,7 +8,7 @@
 'use strict';
 
 import { API, FileInfo } from 'jscodeshift';
-import { ExpressionKind } from 'ast-types/gen/kinds';
+// import { ExpressionKind } from 'ast-types/gen/kinds';
 
 export const parser = "ts";
 
@@ -47,14 +47,13 @@ function importVariables(source: string, api: API): string {
           if (declarator.init) {
             if (declarator.init.type === "Identifier" || declarator.init.type === "MemberExpression") {
               let expression = [];
-              let property = declarator.init;
-              while (property.type !== "Identifier") {
-                  expression.push(property.property.name);
-                  property = property.object;
+              let object = declarator.init;
+              while (object.type !== "Identifier") {
+                expression.push(object.property.name);
+                object = object.object;
               }
-              expression.push(property.name);
-              if (expression.pop() === "imports") {
-                let url = expression.join("/");
+              if (object.name === "imports") {
+                let url = expression.reverse().join("/");
                 switch (declarator.id.type) {
                   case "ObjectPattern":
                     break;
