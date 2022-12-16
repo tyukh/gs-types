@@ -60,9 +60,12 @@ function importVariables(source: string, api: API): string {
                   case "ObjectPattern":
                     break;
                   case "Identifier":
-                    // if(path.node.kind === "var")
-                    //  path.insertBefore(j.variableDeclaration("var", [j.variableDeclarator(declarator.id)]));  
-                    path.insertBefore(j.importDeclaration([j.importNamespaceSpecifier(declarator.id)], j.literal(url)));
+                    let name = declarator.id.name;
+                    if(path.node.kind === "var") {
+                      name = `_imports_${expression.join("_")}`;
+                      path.insertAfter(j.variableDeclaration("var", [j.variableDeclarator(declarator.id, j.identifier(name))]));  
+                    }
+                    path.insertBefore(j.importDeclaration([j.importNamespaceSpecifier(j.identifier(name))], j.literal(url)));
                     return false;
                 }
               }
