@@ -10,6 +10,8 @@
 import { API, FileInfo } from 'jscodeshift';
 // import { ExpressionKind } from 'ast-types/gen/kinds';
 
+"use strict";
+
 export const parser = "ts";
 
 function exportFunctions(source: string, api: API): string {
@@ -43,7 +45,7 @@ function importVariables(source: string, api: API): string {
   root.find(j.VariableDeclaration).forEach((path) => {
     if (path.parent.value.type === "Program") {
       if (path.node.declarations !== undefined) {
-        path.node.declarations.forEach((declarator) => {
+        let declarations = path.node.declarations.filter((declarator) => {
           if (declarator.init) {
             if (declarator.init.type === "Identifier" || declarator.init.type === "MemberExpression") {
               let expression = [];
@@ -58,15 +60,20 @@ function importVariables(source: string, api: API): string {
                   case "ObjectPattern":
                     break;
                   case "Identifier":
-                    let ast = j.importDeclaration([j.importNamespaceSpecifier(declarator.id)], j.literal(url));
-                    path.replace();
-                    path.insertAfter(ast);
-                    break;
+                    // if(path.node.kind === "var")
+                    //  path.insertBefore(j.variableDeclaration("var", [j.variableDeclarator(declarator.id)]));  
+                    path.insertBefore(j.importDeclaration([j.importNamespaceSpecifier(declarator.id)], j.literal(url)));
+                    return false;
                 }
               }
             }
           }
+          return true;
         });
+        if(declarations.length)
+          path.node.declarations = declarations;
+        else
+          path.prune();
       }
     } else {
     }
