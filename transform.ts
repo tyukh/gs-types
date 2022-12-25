@@ -7,19 +7,17 @@
 
 'use strict';
 
-import { API, FileInfo } from 'jscodeshift';
-// import { ExpressionKind } from 'ast-types/gen/kinds';
+import {API, FileInfo, ImportDeclaration} from 'jscodeshift';
+import * as Modules from './transform.modules';
 
-"use strict";
-
-export const parser = "ts";
+export const parser = 'ts';
 
 function exportFunctions(source: string, api: API): string {
   const j = api.jscodeshift;
   const root = j(source);
 
   root.find(j.FunctionDeclaration).forEach((path) => {
-    if (path.parent.value.type === "Program") j(path).replaceWith(j.exportNamedDeclaration(path.node));
+    if (path.parent.value.type === 'Program') j(path).replaceWith(j.exportNamedDeclaration(path.node));
   });
 
   return root.toSource();
@@ -30,55 +28,155 @@ function exportVariables(source: string, api: API): string {
   const root = j(source);
 
   root.find(j.VariableDeclaration).forEach((path) => {
-    if (path.parent.value.type === "Program") {
-      if (path.node.kind === "var") j(path).replaceWith(j.exportNamedDeclaration(path.node));
+    if (path.parent.value.type === 'Program') {
+      if (path.node.kind === 'var') j(path).replaceWith(j.exportNamedDeclaration(path.node));
     }
   });
 
   return root.toSource();
 }
 
+function getModuleURLs(item: string[], modules: string[][]): {module: string; object: string} | undefined {
+  for (const module of modules)
+    if (module.length <= item.length)
+      if (module.every((element: string, index: number) => element === item[index]))
+        return {
+          module: module.join('/'),
+          object: item.slice(module.length).join('/'),
+        };
+  return undefined;
+}
+
 function importVariables(source: string, api: API): string {
   const j = api.jscodeshift;
   const root = j(source);
 
-  root.find(j.VariableDeclaration).forEach((path) => {
-    if (path.parent.value.type === "Program") {
-      if (path.node.declarations !== undefined) {
-        let declarations = path.node.declarations.filter((declarator) => {
-          if (declarator.init) {
-            if (declarator.init.type === "Identifier" || declarator.init.type === "MemberExpression") {
-              let expression = [];
-              let object = declarator.init;
-              while (object.type !== "Identifier") {
-                expression.push(object.property.name);
-                object = object.object;
-              }
-              if (object.name === "imports") {
-                let url = expression.reverse().join("/");
-                switch (declarator.id.type) {
-                  case "ObjectPattern":
-                    break;
-                  case "Identifier":
-                    let name = declarator.id.name;
-                    if(path.node.kind === "var") {
-                      name = `_imports_${expression.join("_")}`;
-                      path.insertAfter(j.variableDeclaration("var", [j.variableDeclarator(declarator.id, j.identifier(name))]));  
-                    }
-                    path.insertBefore(j.importDeclaration([j.importNamespaceSpecifier(j.identifier(name))], j.literal(url)));
-                    return false;
-                }
-              }
-            }
-          }
+  function insertTopImport(ast: ImportDeclaration) {
+    let path = root.find(j.ImportDeclaration);
+    if (path.length) path.at(path.length - 1).insertAfter(ast);
+    else root.get().node.program.body.unshift(ast);
+  }
+
+  function isImported(name: string): boolean {
+    for (const path of root.find(j.ModuleSpecifier).paths()) if (path.node.local?.name === name) return true;
+    return false;
+  }
+
+  root.find(j.Identifier).forEach((path) => {
+    if (path.node.name !== 'imports') return;
+
+    let imports: string[] = [];
+    let parent = path.parent;
+    while (parent.node.type === 'MemberExpression') {
+      imports.push(parent.node.property.name);
+      parent = parent.parent;
+    }
+
+    function getImportsName(object: string | undefined = undefined): string {
+      if (object !== undefined) return `_imports_${imports.join('_')}_${object}_`;
+      return `_imports_${imports.join('_')}_`;
+    }
+
+    function createImport(variable: string, object: string | undefined = undefined): boolean {
+      if (isImported(variable)) return true;
+
+      function isUndefinedError(value: any, message: string, node: any) {
+        if (value === undefined) {
+          if (node.comments === undefined) node.comments = [];
+          node.comments.push(j.commentLine(message));
+          console.log(message);
           return true;
-        });
-        if(declarations.length)
-          path.node.declarations = declarations;
-        else
-          path.prune();
+        }
+        return false;
       }
-    } else {
+
+      if (isUndefinedError(imports.at(0), ` -!!!- ${variable}: Domain is absent`, parent.node)) return false;
+      let modules: string[][] = Modules.domainsModulesMap.get(imports.at(0)!)!;
+      if (isUndefinedError(modules, ` -!!!- ${variable}: Unknown domain "${imports.at(0)}"`, parent.node)) return false;
+
+      function checkObject() {
+        if (object !== undefined) {
+          let importsInclusive = [...imports];
+          importsInclusive.push(object);
+          return getModuleURLs(importsInclusive, modules);
+        }
+        return getModuleURLs(imports, modules);
+      }
+
+      let url: {module: string; object: string} = checkObject()!;
+      if (isUndefinedError(url, ` -!!!- ${variable}: Unknown module "${imports.join('/')}"`, parent.node)) return false;
+
+      if (imports.at(0) === 'gi') url.module = Modules.giMap.get(url.module)!;
+
+      if (url.object !== '')
+        insertTopImport(
+          j.importDeclaration([j.importSpecifier(j.identifier(url.object), j.identifier(variable))], j.literal(url.module))
+        );
+      else insertTopImport(j.importDeclaration([j.importNamespaceSpecifier(j.identifier(variable))], j.literal(url.module)));
+
+      return true;
+    }
+
+    switch (parent.node.type) {
+      case 'VariableDeclarator':
+        switch (parent.node.id.type) {
+          case 'Identifier':
+            {
+              let variableDeclaration = parent.parent;
+              let variableDeclarator = parent;
+              let name = variableDeclarator.node.id.name;
+              if (variableDeclaration.node.kind === 'var' || variableDeclaration.parent.value.type !== 'Program') {
+                name = getImportsName();
+                if (createImport(name))
+                  variableDeclarator.replace(
+                    j.variableDeclarator(j.identifier(variableDeclarator.node.id.name), j.identifier(name))
+                  );
+              } else if (createImport(name)) variableDeclarator.replace();
+              if (variableDeclaration.node.declarations.length === 0) variableDeclaration.prune();
+            }
+            break;
+
+          case 'ObjectPattern':
+            {
+              let variableDeclaration = parent.parent;
+              let variableDeclarator = parent;
+              let properties = variableDeclarator.node.id.properties.filter((property: any) => {
+                let name = property.key.name;
+                if (variableDeclaration.node.kind === 'var' || variableDeclaration.parent.value.type !== 'Program') {
+                  name = getImportsName(name);
+                  if (createImport(name, property.key.name)) {
+                    variableDeclaration.insertAfter(
+                      j.variableDeclaration(variableDeclaration.node.kind, [
+                        j.variableDeclarator(j.identifier(property.key.name), j.identifier(name)),
+                      ])
+                    );
+                    return false;
+                  }
+                  return true;
+                }
+                return !createImport(name, property.key.name);
+              });
+              if (properties.length) variableDeclarator.node.id.properties = properties;
+              else variableDeclarator.replace();
+              if (variableDeclaration.node.declarations.length === 0) variableDeclaration.prune();
+            }
+            break;
+        }
+        break;
+
+      case 'ObjectProperty':
+        {
+          let name = getImportsName();
+          if (createImport(name)) parent.node.value = j.identifier(name);
+        }
+        break;
+
+      case 'CallExpression':
+        {
+          let name = getImportsName();
+          if (createImport(name)) parent.node.arguments = [j.identifier(name)];
+        }
+        break;
     }
   });
   return root.toSource();
