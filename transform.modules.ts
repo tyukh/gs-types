@@ -280,8 +280,20 @@ export const giMap: Map<string, string> = new Map(giModules.map((key, index) => 
 
 export const domainsModulesMap: Map<string, string[][]> = new Map([
   ['gi', giModules],
+  ['cairo', giModules],
   ['gdm', gdmModules],
   ['misc', miscModules],
   ['perf', perfModules],
   ['ui', uiModules],
 ]);
+
+export function getModuleURLs(item: string[], modules: string[][]): {module: string; object: string} | undefined {
+  for (const module of modules)
+    if (module.length <= item.length)
+      if (module.every((element: string, index: number) => element === item[index]))
+        return {
+          module: module.join('/'),
+          object: item.slice(module.length).join('/'),
+        };
+  return undefined;
+}

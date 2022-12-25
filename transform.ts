@@ -36,17 +36,6 @@ function exportVariables(source: string, api: API): string {
   return root.toSource();
 }
 
-function getModuleURLs(item: string[], modules: string[][]): {module: string; object: string} | undefined {
-  for (const module of modules)
-    if (module.length <= item.length)
-      if (module.every((element: string, index: number) => element === item[index]))
-        return {
-          module: module.join('/'),
-          object: item.slice(module.length).join('/'),
-        };
-  return undefined;
-}
-
 function importVariables(source: string, api: API): string {
   const j = api.jscodeshift;
   const root = j(source);
@@ -98,15 +87,15 @@ function importVariables(source: string, api: API): string {
         if (object !== undefined) {
           let importsInclusive = [...imports];
           importsInclusive.push(object);
-          return getModuleURLs(importsInclusive, modules);
+          return Modules.getModuleURLs(importsInclusive, modules);
         }
-        return getModuleURLs(imports, modules);
+        return Modules.getModuleURLs(imports, modules);
       }
 
       let url: {module: string; object: string} = checkObject()!;
       if (isUndefinedError(url, ` -!!!- ${variable}: Unknown module "${imports.join('/')}"`, parent.node)) return false;
 
-      if (imports.at(0) === 'gi') url.module = Modules.giMap.get(url.module)!;
+      if (imports.at(0) === 'gi' || imports.at(0) === 'cairo') url.module = Modules.giMap.get(url.module)!;
 
       if (url.object !== '')
         insertTopImport(
