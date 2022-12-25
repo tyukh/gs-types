@@ -84,7 +84,7 @@ function importVariables(source: string, api: API): string {
         if (value === undefined) {
           if (node.comments === undefined) node.comments = [];
           node.comments.push(j.commentLine(message));
-          console.log(message);
+          api.report(message);
           return true;
         }
         return false;
