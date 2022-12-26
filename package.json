@@ -20,7 +20,8 @@
   "scripts": {
     "transform": "yarn jscodeshift -t transform.ts ./src",
     "extract": "./extract.sh",
-    "compile": "yarn tsc -p ./src/tsconfig.json"
+    "compile": "yarn tsc -p ./src/tsconfig.json",
+    "rename": "./rename.sh"
   },
   "dependencies": {
     "@gi-types/accountsservice1": "^1.0.1",
