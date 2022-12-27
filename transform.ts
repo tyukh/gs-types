@@ -7,30 +7,45 @@
 
 'use strict';
 
-import {API, FileInfo, ImportDeclaration} from 'jscodeshift';
+import {ExpressionKind} from 'ast-types/gen/kinds';
+import {API, FileInfo, ImportDeclaration, ObjectProperty} from 'jscodeshift';
 import * as Modules from './transform.modules';
 
 export const parser = 'ts';
 
-function exportFunctions(source: string, api: API): string {
+function objectNamespaces(source: string, api: API): string {
   const j = api.jscodeshift;
   const root = j(source);
 
-  root.find(j.FunctionDeclaration).forEach((path) => {
-    if (path.parent.value.type === 'Program') j(path).replaceWith(j.exportNamedDeclaration(path.node));
-  });
+  function createExpression(properties: string[]): ExpressionKind {
+    let object: ExpressionKind = j.identifier('imports');
+    for (const property of properties) object = j.memberExpression(object, j.identifier(property));
+    return object;
+  }
 
-  return root.toSource();
-}
+  root.find(j.Identifier).forEach((path) => {
+    if (path.node.name !== 'imports') return;
 
-function exportVariables(source: string, api: API): string {
-  const j = api.jscodeshift;
-  const root = j(source);
-
-  root.find(j.VariableDeclaration).forEach((path) => {
-    if (path.parent.value.type === 'Program') {
-      if (path.node.kind === 'var') j(path).replaceWith(j.exportNamedDeclaration(path.node));
+    let imports: string[] = [];
+    let parent = path.parent;
+    while (parent.node.type === 'MemberExpression') {
+      imports.push(parent.node.property.name);
+      parent = parent.parent;
     }
+
+    if (parent.node.type !== 'VariableDeclarator') return;
+    if (parent.node.id.type !== 'Identifier') return;
+    if (imports.at(0) === undefined) return;
+    let modules: string[][] = Modules.domainsModulesMap.get(imports.at(0)!)!;
+    if (modules === undefined) return;
+
+    let properties: ObjectProperty[] = [];
+    for (const module of modules)
+      if (module.length > imports.length)
+        if (imports.every((element, index) => element === module[index]))
+          properties.push(j.objectProperty(j.identifier(module.slice(imports.length).join('')), createExpression(module)));
+
+    if (properties.length !== 0) parent.node.init = j.objectExpression(properties);
   });
 
   return root.toSource();
@@ -171,9 +186,34 @@ function importVariables(source: string, api: API): string {
   return root.toSource();
 }
 
+function exportFunctions(source: string, api: API): string {
+  const j = api.jscodeshift;
+  const root = j(source);
+
+  root.find(j.FunctionDeclaration).forEach((path) => {
+    if (path.parent.value.type === 'Program') j(path).replaceWith(j.exportNamedDeclaration(path.node));
+  });
+
+  return root.toSource();
+}
+
+function exportVariables(source: string, api: API): string {
+  const j = api.jscodeshift;
+  const root = j(source);
+
+  root.find(j.VariableDeclaration).forEach((path) => {
+    if (path.parent.value.type === 'Program') {
+      if (path.node.kind === 'var') j(path).replaceWith(j.exportNamedDeclaration(path.node));
+    }
+  });
+
+  return root.toSource();
+}
+
 export default function transformer(file: FileInfo, api: API): string {
   let source: string = file.source;
 
+  source = objectNamespaces(source, api);
   source = importVariables(source, api);
   source = exportFunctions(source, api);
   source = exportVariables(source, api);
