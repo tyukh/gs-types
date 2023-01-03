@@ -157,7 +157,7 @@ export const giModules: string[][] = [
   ['gi', 'Adw'],
   ['gi', 'Atk'],
   ['gi', 'Atspi'],
-  ['cairo'],
+  ['gi', 'cairo'],
   ['gi', 'Cally'],
   ['gi', 'Clutter'],
   ['gi', 'ClutterX11'],
@@ -212,6 +212,10 @@ export const giModules: string[][] = [
   ['gi', 'WebKit2WebExtension'],
   ['gi', 'xfixes'],
   ['gi', 'xlib'],
+];
+
+export const defaultModules: string[][] = [
+  ['cairo'],
 ];
 
 const giURLs: string[] = [
@@ -276,24 +280,22 @@ const giURLs: string[] = [
   '@gi-types/xlib2',
 ];
 
+const defaultURLs: string[] = [
+  '@gi-types/cairo1'
+];
+
+export const gdmMap: Map<string, string> = new Map(gdmModules.map((key, _) => [key.join('/'), key.join('/')]));
+export const miscMap: Map<string, string> = new Map(miscModules.map((key, _) => [key.join('/'), key.join('/')]));
+export const perfMap: Map<string, string> = new Map(perfModules.map((key, _) => [key.join('/'), key.join('/')]));
+export const uiMap: Map<string, string> = new Map(uiModules.map((key, _) => [key.join('/'), key.join('/')]));
 export const giMap: Map<string, string> = new Map(giModules.map((key, index) => [key.join('/'), giURLs[index]]));
+export const defaultMap: Map<string, string> = new Map(defaultModules.map((key, index) => [key.join('/'), defaultURLs[index]]));
 
-export const domainsModulesMap: Map<string, string[][]> = new Map([
-  ['gi', giModules],
-  ['cairo', giModules],
-  ['gdm', gdmModules],
-  ['misc', miscModules],
-  ['perf', perfModules],
-  ['ui', uiModules],
+export const domainsModulesMap: Map<string, {modules: string[][], map: Map<string, string>}> = new Map([
+  ['', {modules: defaultModules, map: defaultMap}],
+  ['gi', {modules: giModules, map: giMap}],
+  ['gdm', {modules: gdmModules, map: gdmMap}],
+  ['misc', {modules: miscModules, map: miscMap}],
+  ['perf', {modules: perfModules, map: perfMap}],
+  ['ui', {modules: uiModules, map: uiMap}],
 ]);
-
-export function getModuleURLs(item: string[], modules: string[][]): {module: string; object: string} | undefined {
-  for (const module of modules)
-    if (module.length <= item.length)
-      if (module.every((element: string, index: number) => element === item[index]))
-        return {
-          module: module.join('/'),
-          object: item.slice(module.length).join('/'),
-        };
-  return undefined;
-}

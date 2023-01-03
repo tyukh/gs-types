@@ -8,14 +8,20 @@
 'use strict';
 
 import {ExpressionKind} from 'ast-types/gen/kinds';
-import {API, FileInfo, ImportDeclaration, ObjectProperty} from 'jscodeshift';
+import {API, FileInfo, Identifier, ImportDeclaration, ObjectProperty} from 'jscodeshift';
 import * as Modules from './transform.modules';
 
 export const parser = 'ts';
 
-function objectNamespaces(source: string, api: API): string {
+function transformNamespaces(source: string, api: API): string {
   const j = api.jscodeshift;
   const root = j(source);
+
+  function isVariableDefined(name: string): boolean {
+    for (const path of root.find(j.VariableDeclarator).paths())
+      if (path.parent.parent.value.type === 'Program') if ((path.node.id as Identifier).name === name) return true;
+    return false;
+  }
 
   function createExpression(properties: string[]): ExpressionKind {
     let object: ExpressionKind = j.identifier('imports');
@@ -28,30 +34,46 @@ function objectNamespaces(source: string, api: API): string {
 
     let imports: string[] = [];
     let parent = path.parent;
+    let child = undefined;
     while (parent.node.type === 'MemberExpression') {
+      child = parent;
       imports.push(parent.node.property.name);
       parent = parent.parent;
     }
 
-    if (parent.node.type !== 'VariableDeclarator') return;
-    if (parent.node.id.type !== 'Identifier') return;
+    let computed: string | undefined = undefined;
+    if (child.node.computed === true) computed = imports.pop();
+
+    if (parent.node.type === 'VariableDeclarator') if (parent.node.id.type === 'ObjectPattern') return;
+
     if (imports.at(0) === undefined) return;
-    let modules: string[][] = Modules.domainsModulesMap.get(imports.at(0)!)!;
-    if (modules === undefined) return;
+    let modules: {modules: string[][]; map: Map<string, string>} = Modules.domainsModulesMap.get(imports.at(0)!)!;
+    if (modules === undefined) modules = Modules.domainsModulesMap.get('')!;
 
     let properties: ObjectProperty[] = [];
-    for (const module of modules)
+    for (const module of modules.modules)
       if (module.length > imports.length)
         if (imports.every((element, index) => element === module[index]))
           properties.push(j.objectProperty(j.identifier(module.slice(imports.length).join('')), createExpression(module)));
 
-    if (properties.length !== 0) parent.node.init = j.objectExpression(properties);
+    if (properties.length !== 0) {
+      let name = `_imports_${imports.join('_')}_`;
+      if (!isVariableDefined(name))
+        root
+          .get()
+          .node.program.body.unshift(
+            j.variableDeclaration('let', [j.variableDeclarator(j.identifier(name), j.objectExpression(properties))])
+          );
+
+      if (computed === undefined) child.replace(j.identifier(name));
+      else child.replace(j.memberExpression(j.identifier(name), j.identifier(computed), true));
+    }
   });
 
   return root.toSource();
 }
 
-function importVariables(source: string, api: API): string {
+function transformImportVariables(source: string, api: API): string {
   const j = api.jscodeshift;
   const root = j(source);
 
@@ -71,7 +93,9 @@ function importVariables(source: string, api: API): string {
 
     let imports: string[] = [];
     let parent = path.parent;
+    let child = undefined;
     while (parent.node.type === 'MemberExpression') {
+      child = parent;
       imports.push(parent.node.property.name);
       parent = parent.parent;
     }
@@ -95,22 +119,34 @@ function importVariables(source: string, api: API): string {
       }
 
       if (isUndefinedError(imports.at(0), ` -!!!- ${variable}: Domain is absent`, parent.node)) return false;
-      let modules: string[][] = Modules.domainsModulesMap.get(imports.at(0)!)!;
-      if (isUndefinedError(modules, ` -!!!- ${variable}: Unknown domain "${imports.at(0)}"`, parent.node)) return false;
+      let modules: {modules: string[][]; map: Map<string, string>} = Modules.domainsModulesMap.get(imports.at(0)!)!;
+      // if (isUndefinedError(modules, ` -!!!- ${variable}: Unknown domain "${imports.at(0)}"`, parent.node)) return false;
+      if (modules === undefined) modules = Modules.domainsModulesMap.get('')!;
+
+      function getModuleURLs(item: string[], modules: string[][]): {module: string; object: string} | undefined {
+        for (const module of modules)
+          if (module.length <= item.length)
+            if (module.every((element: string, index: number) => element === item[index]))
+              return {
+                module: module.join('/'),
+                object: item.slice(module.length).join('/'),
+              };
+        return undefined;
+      }
 
       function checkObject() {
         if (object !== undefined) {
           let importsInclusive = [...imports];
           importsInclusive.push(object);
-          return Modules.getModuleURLs(importsInclusive, modules);
+          return getModuleURLs(importsInclusive, modules.modules);
         }
-        return Modules.getModuleURLs(imports, modules);
+        return getModuleURLs(imports, modules.modules);
       }
 
       let url: {module: string; object: string} = checkObject()!;
       if (isUndefinedError(url, ` -!!!- ${variable}: Unknown module "${imports.join('/')}"`, parent.node)) return false;
 
-      if (imports.at(0) === 'gi' || imports.at(0) === 'cairo') url.module = Modules.giMap.get(url.module)!;
+      url.module = modules.map.get(url.module)!;
 
       if (url.object !== '')
         insertTopImport(
@@ -145,16 +181,12 @@ function importVariables(source: string, api: API): string {
               let variableDeclaration = parent.parent;
               let variableDeclarator = parent;
               let properties = variableDeclarator.node.id.properties.filter((property: any) => {
-                let name = property.key.name;
+                let name = property.value.name;
                 if (variableDeclaration.node.kind === 'var' || variableDeclaration.parent.value.type !== 'Program') {
-                  name = getImportsName(name);
+                  name = getImportsName(property.key.name);
                   if (createImport(name, property.key.name)) {
-                    variableDeclaration.insertAfter(
-                      j.variableDeclaration(variableDeclaration.node.kind, [
-                        j.variableDeclarator(j.identifier(property.key.name), j.identifier(name)),
-                      ])
-                    );
-                    return false;
+                    variableDeclarator.replace(j.variableDeclarator(j.identifier(property.value.name), j.identifier(name)));
+                    return true;
                   }
                   return true;
                 }
@@ -168,6 +200,13 @@ function importVariables(source: string, api: API): string {
         }
         break;
 
+      case 'AssignmentExpression':
+        {
+          let name = getImportsName();
+          if (createImport(name)) child.replace(j.identifier(name));
+        }
+        break;
+
       case 'ObjectProperty':
         {
           let name = getImportsName();
@@ -176,9 +215,10 @@ function importVariables(source: string, api: API): string {
         break;
 
       case 'CallExpression':
+      case 'NewExpression':
         {
           let name = getImportsName();
-          if (createImport(name)) parent.node.arguments = [j.identifier(name)];
+          if (createImport(name)) child.replace(j.identifier(name));
         }
         break;
     }
@@ -186,7 +226,7 @@ function importVariables(source: string, api: API): string {
   return root.toSource();
 }
 
-function exportFunctions(source: string, api: API): string {
+function transformExportFunctions(source: string, api: API): string {
   const j = api.jscodeshift;
   const root = j(source);
 
@@ -197,7 +237,7 @@ function exportFunctions(source: string, api: API): string {
   return root.toSource();
 }
 
-function exportVariables(source: string, api: API): string {
+function transformExportVariables(source: string, api: API): string {
   const j = api.jscodeshift;
   const root = j(source);
 
@@ -213,10 +253,10 @@ function exportVariables(source: string, api: API): string {
 export default function transformer(file: FileInfo, api: API): string {
   let source: string = file.source;
 
-  source = objectNamespaces(source, api);
-  source = importVariables(source, api);
-  source = exportFunctions(source, api);
-  source = exportVariables(source, api);
+  source = transformNamespaces(source, api);
+  source = transformImportVariables(source, api);
+  source = transformExportFunctions(source, api);
+  source = transformExportVariables(source, api);
 
   return source;
 }
