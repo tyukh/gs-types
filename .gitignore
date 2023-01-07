@@ -10,3 +10,4 @@
 #!.yarn/cache
 .pnp.*
 ## Swapped
+node_modules/.cache/*
