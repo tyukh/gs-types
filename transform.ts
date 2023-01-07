@@ -8,7 +8,16 @@
 'use strict';
 
 import {ExpressionKind} from 'ast-types/gen/kinds';
-import {API, FileInfo, Identifier, ImportDeclaration, ObjectProperty} from 'jscodeshift';
+import {
+  API,
+  ExportNamedDeclaration,
+  FileInfo,
+  FunctionDeclaration,
+  Identifier,
+  ImportDeclaration,
+  ObjectProperty,
+  VariableDeclaration,
+} from 'jscodeshift';
 import * as Modules from './transform.modules';
 
 export const parser = 'ts';
@@ -226,12 +235,18 @@ function transformImportVariables(source: string, api: API): string {
   return root.toSource();
 }
 
+function moveComments(destination: ExportNamedDeclaration, source: FunctionDeclaration | VariableDeclaration) {
+  destination.comments = source.comments;
+  source.comments = undefined;
+  return destination;
+}
+
 function transformExportFunctions(source: string, api: API): string {
   const j = api.jscodeshift;
   const root = j(source);
 
   root.find(j.FunctionDeclaration).forEach((path) => {
-    if (path.parent.value.type === 'Program') j(path).replaceWith(j.exportNamedDeclaration(path.node));
+    if (path.parent.value.type === 'Program') path.replace(moveComments(j.exportNamedDeclaration(path.node), path.node));
   });
 
   return root.toSource();
@@ -242,9 +257,8 @@ function transformExportVariables(source: string, api: API): string {
   const root = j(source);
 
   root.find(j.VariableDeclaration).forEach((path) => {
-    if (path.parent.value.type === 'Program') {
-      if (path.node.kind === 'var') j(path).replaceWith(j.exportNamedDeclaration(path.node));
-    }
+    if (path.parent.value.type === 'Program')
+      if (path.node.kind === 'var') path.replace(moveComments(j.exportNamedDeclaration(path.node), path.node));
   });
 
   return root.toSource();
